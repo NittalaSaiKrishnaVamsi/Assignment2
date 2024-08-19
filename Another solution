@@ -1,0 +1,93 @@
+import tensorflow as tf
+import tensorflow_hub as hub
+from tensorflow.keras.preprocessing import image
+import numpy as np
+import base64
+from io import BytesIO
+from PIL import Image
+
+# Load the pre-trained model from TensorFlow Hub
+model_url = "https://tfhub.dev/sayakpaul/plant_disease_model/1"
+model = tf.keras.Sequential([
+    hub.KerasLayer(model_url, input_shape=(224, 224, 3))
+])
+
+# Define a dictionary to map model predictions to disease names and solutions
+disease_dict = {
+    0: {
+        'name': 'Apple Scab',
+        'solution': 'Apply fungicides like captan or mancozeb. Remove and destroy fallen leaves and infected fruit to reduce the spread of the disease.'
+    },
+    23: {
+        'name': 'Tomato Late Blight',
+        'solution': 'Apply fungicides like mancozeb or chlorothalonil. Remove and destroy infected plants. Avoid overhead watering.'
+    },
+    # Add more diseases and pests as per your model's output classes
+}
+
+# Embedded images as base64 strings
+apple_scab_image_base64 = """
+iVBORw0KGgoAAAANSUhEUgAAAXcAAAF3CAYAAAAeukBMAAAABGdBTUEAALGPC/xhBQAAACBjSFJN
+AAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAA3N0lEQVR4nO3dyW3kMBRFUdq5
+...
+"""  # Truncated for brevity
+
+tomato_late_blight_image_base64 = """
+iVBORw0KGgoAAAANSUhEUgAAAXcAAAF3CAYAAAAeukBMAAAABGdBTUEAALGPC/xhBQAAACBjSFJN
+AAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAA3N0lEQVR4nO3dyW3kMBRFUdq5
+...
+"""  # Truncated for brevity
+
+def decode_image_from_base64(base64_string):
+    """Decodes a base64 string to an image."""
+    image_data = base64.b64decode(base64_string)
+    image = Image.open(BytesIO(image_data))
+    return image
+
+def load_and_preprocess_image(img):
+    """Preprocesses the image for prediction."""
+    img = img.resize((224, 224))
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array /= 255.0  # Normalize to [0, 1] range
+    return img_array
+
+def predict_disease(img):
+    """Predicts the disease or pest based on the image and provides a solution."""
+    img_array = load_and_preprocess_image(img)
+    prediction = model.predict(img_array)
+    predicted_class = np.argmax(prediction, axis=1)[0]
+    disease_info = disease_dict.get(predicted_class, {'name': 'Unknown', 'solution': 'No solution available.'})
+    return disease_info
+
+def main():
+    print("Welcome to the Crop Disease and Pest Management System!")
+    
+    while True:
+        print("\nChoose an example image for testing:")
+        print("1. Apple Scab")
+        print("2. Tomato Late Blight")
+        choice = input("Enter the number of your choice: ").strip()
+
+        if choice == '1':
+            img = decode_image_from_base64(apple_scab_image_base64)
+        elif choice == '2':
+            img = decode_image_from_base64(tomato_late_blight_image_base64)
+        else:
+            print("Invalid choice. Exiting.")
+            break
+
+        try:
+            disease_info = predict_disease(img)
+            print(f"\nThe system has identified the problem as: {disease_info['name']}")
+            print(f"Recommended Solution: {disease_info['solution']}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+        another = input("\nDo you want to analyze another image? (yes/no): ").strip().lower()
+        if another != 'yes':
+            print("Exiting the system. Thank you!")
+            break
+
+if __name__ == "__main__":
+    main()
